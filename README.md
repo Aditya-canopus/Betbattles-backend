@@ -26,6 +26,14 @@
 
 [Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
 
+## clone repo
+git init 
+git remote add origin https://github.com/Aditya-canopus/Betbattles-backend.git
+git add .
+git commit -m "initial commit"
+git pull origin main
+git push -u origin main
+
 ## Project setup
 
 ```bash
