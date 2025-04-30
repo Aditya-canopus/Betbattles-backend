@@ -1,0 +1,263 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum KycStatus {
+  pending
+  verified
+  failed
+}
+
+enum PaymentMethodType {
+  card
+  paypal
+  applepay
+}
+
+enum MatchStatus {
+  upcoming
+  live
+  completed
+}
+
+enum BetType {
+  spread
+  ml
+  total
+}
+
+enum BetSelection {
+  home
+  away
+  over
+  under
+}
+
+enum BetStatus {
+  pending
+  won
+  lost
+  canceled
+}
+
+enum TeamBetStatus {
+  pending
+  accepted
+  drafting
+  completed
+}
+
+enum TransactionType {
+  charge
+  payout
+}
+
+enum TransactionStatus {
+  pending
+  completed
+  failed
+}
+
+enum FriendStatus {
+  pending
+  accepted
+}
+
+model User {
+  id                   Int                   @id @default(autoincrement())
+  email                String                @unique
+  password             String
+  name                 String
+  dob                  DateTime
+  username             String                @unique
+  avatar_id            String?
+  photo_url            String?
+  referral_code        String?               @unique
+  created_at           DateTime              @default(now())
+  updated_at           DateTime              @updatedAt
+  status               String                @default("not_verified") // ✅ New field added here
+  stripe_customer_id   String? // ✅ Add this line!
+  kyc                  KycVerification?
+  paymentMethods       PaymentMethod[]
+  bets                 Bet[]
+  friends              Friend[]              @relation("UserFriends")
+  friendOf             Friend[]              @relation("FriendOfUser")
+  chatMessages         ChatMessage[]
+  notifications        Notification[]
+  notificationSettings NotificationSettings?
+  draftSelections      DraftSelection[]
+  transactions         Transaction[]
+  reset_token          String?
+  reset_token_expiry   DateTime?
+
+  @@index([username])
+}
+
+model KycVerification {
+  id                  Int      @id @default(autoincrement())
+  user_id             Int      @unique
+  user                User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  document_type       String?
+  document_number     String?
+  verification_status String?
+  verification_data   Json?
+  created_at          DateTime @default(now())
+  updated_at          DateTime @updatedAt
+}
+
+model PaymentMethod {
+  id            Int               @id @default(autoincrement())
+  user_id       Int
+  type          PaymentMethodType
+  last_four     String
+  payment_token String
+  created_at    DateTime          @default(now())
+  user          User              @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  transactions  Transaction[]
+}
+
+model Match {
+  id           Int         @id @default(autoincrement())
+  event        String
+  league       String
+  date_time    DateTime
+  status       MatchStatus
+  home_team_id Int
+  away_team_id Int
+  venue        String
+  last_updated DateTime    @default(now())
+  home_team    Team        @relation("HomeTeam", fields: [home_team_id], references: [id])
+  away_team    Team        @relation("AwayTeam", fields: [away_team_id], references: [id])
+  odds         Odd?
+  bets         Bet[]
+}
+
+model Team {
+  id              Int              @id @default(autoincrement())
+  name            String
+  league          String
+  logo_url        String
+  wins            Int?
+  losses          Int?
+  points_scored   Int?
+  last_updated    DateTime         @default(now())
+  home_matches    Match[]          @relation("HomeTeam")
+  away_matches    Match[]          @relation("AwayTeam")
+  draftSelections DraftSelection[]
+}
+
+model Odd {
+  id           Int      @id @default(autoincrement())
+  match_id     Int      @unique
+  spread_home  Float
+  spread_away  Float
+  ml_home      Int
+  ml_away      Int
+  total        Float
+  last_updated DateTime @default(now())
+  match        Match    @relation(fields: [match_id], references: [id], onDelete: Cascade)
+}
+
+model Bet {
+  id                Int           @id @default(autoincrement())
+  user_id           Int
+  match_id          Int
+  bet_type          BetType
+  selection         BetSelection
+  amount            Float
+  odds_at_placement Float
+  status            BetStatus
+  payout            Float?
+  created_at        DateTime      @default(now())
+  updated_at        DateTime      @updatedAt
+  user              User          @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  match             Match         @relation(fields: [match_id], references: [id], onDelete: Cascade)
+  teamBet           TeamBet?
+  transactions      Transaction[]
+  chatMessages      ChatMessage[]
+}
+
+model TeamBet {
+  id              Int              @id @default(autoincrement())
+  bet_id          Int              @unique
+  team1_user_ids  Int[] // Array of user IDs for Team 1
+  team2_user_ids  Int[] // Array of user IDs for Team 2
+  draft_size      Int
+  status          TeamBetStatus
+  created_at      DateTime         @default(now())
+  bet             Bet              @relation(fields: [bet_id], references: [id], onDelete: Cascade)
+  draftSelections DraftSelection[]
+}
+
+model DraftSelection {
+  id          Int      @id @default(autoincrement())
+  team_bet_id Int
+  team_id     Int
+  user_id     Int
+  round       Int
+  created_at  DateTime @default(now())
+  teamBet     TeamBet  @relation(fields: [team_bet_id], references: [id], onDelete: Cascade)
+  team        Team     @relation(fields: [team_id], references: [id])
+  user        User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}
+
+model Transaction {
+  id                Int               @id @default(autoincrement())
+  user_id           Int
+  bet_id            Int
+  payment_method_id Int
+  type              TransactionType
+  amount            Float
+  status            TransactionStatus
+  created_at        DateTime          @default(now())
+  user              User              @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  bet               Bet               @relation(fields: [bet_id], references: [id], onDelete: Cascade)
+  paymentMethod     PaymentMethod     @relation(fields: [payment_method_id], references: [id], onDelete: Cascade)
+}
+
+model Friend {
+  id         Int          @id @default(autoincrement())
+  user_id    Int
+  friend_id  Int
+  status     FriendStatus
+  created_at DateTime     @default(now())
+  user       User         @relation("UserFriends", fields: [user_id], references: [id], onDelete: Cascade)
+  friend     User         @relation("FriendOfUser", fields: [friend_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, friend_id])
+}
+
+model ChatMessage {
+  id         Int      @id @default(autoincrement())
+  bet_id     Int
+  user_id    Int
+  message    String
+  created_at DateTime @default(now())
+  bet        Bet      @relation(fields: [bet_id], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id         Int      @id @default(autoincrement())
+  user_id    Int
+  message    String
+  read       Boolean  @default(false)
+  created_at DateTime @default(now())
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}
+
+model NotificationSettings {
+  id           Int      @id @default(autoincrement())
+  user_id      Int      @unique
+  all_bets     Boolean  @default(true)
+  heads_up     Boolean  @default(false)
+  friends_only Boolean  @default(true)
+  team_player  Boolean  @default(false)
+  updated_at   DateTime @updatedAt
+  user         User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}

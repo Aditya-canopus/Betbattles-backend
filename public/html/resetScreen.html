@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reset Your Password</title>
+
+  <link rel="stylesheet" href="/css/custom.css" />
+  <link rel="stylesheet" href="/css/main.css" />
+  <link rel="stylesheet" href="/css/sweetalert2.min.css" />
+  <link rel="stylesheet" href="/css/steps-section.css" />
+  <link rel="stylesheet" href="/css/font.icon.icomoon.css" />
+  
+  <style>
+    body {
+      background: #f4f6f8;
+      font-family: 'Arial', sans-serif;
+    }
+
+    .reset-container {
+      max-width: 400px;
+      margin: 50px auto;
+      background: #ffffff;
+      padding: 30px 25px;
+      border-radius: 10px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .reset-container h2 {
+      text-align: center;
+      margin-bottom: 20px;
+      color: #333;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+      position: relative;
+    }
+
+    .form-group input {
+      width: 100%;
+      padding: 10px 40px 10px 10px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+
+    .see-password {
+      position: absolute;
+      right: 10px;
+      top: 10px;
+      cursor: pointer;
+      font-size: 18px;
+      color: #aaa;
+    }
+
+    .see-password.active {
+      color: #007bff;
+    }
+
+    .submit-btn {
+      width: 100%;
+      padding: 10px;
+      background-color: #007bff;
+      color: white;
+      font-weight: bold;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    .submit-btn:hover {
+      background-color: #0056b3;
+    }
+
+    #errorMessage {
+      color: red;
+      font-weight: bold;
+      text-align: center;
+      margin-bottom: 15px;
+    }
+
+    footer {
+      text-align: center;
+      padding: 20px 0;
+      font-size: 14px;
+      color: #999;
+    }
+  </style>
+
+  <script>
+    function validateForm(event) {
+      event.preventDefault();
+
+      const password = document.querySelector('[name="password"]').value;
+      const confirmPassword = document.querySelector('[name="cpassword"]').value;
+      const errorMessage = document.getElementById('errorMessage');
+
+      errorMessage.textContent = '';
+
+      if (!password || !confirmPassword) {
+        errorMessage.textContent = 'All fields are required.';
+        return;
+      }
+
+      if (password.length < 5) {
+        errorMessage.textContent = 'Password must be at least 6 characters long.';
+        return;
+      }
+
+      if (password !== confirmPassword) {
+        errorMessage.textContent = 'New password and confirm password do not match.';
+        return;
+      }
+
+      if (password === 'oldPasswordExample') {
+        errorMessage.textContent = 'New password cannot be the same as the old password.';
+        return;
+      }
+
+      document.getElementById('login_form').submit();
+    }
+
+    window.onload = function () {
+      const urlParams = new URLSearchParams(window.location.search);
+      const token = urlParams.get('token');
+      if (token) {
+        document.querySelector('[name="token"]').value = token;
+      } else {
+        document.getElementById('errorMessage').textContent = 'Invalid or missing reset token.';
+      }
+    };
+
+    document.addEventListener('DOMContentLoaded', function () {
+      const togglePasswordVisibility = (icon, input) => {
+        icon.addEventListener('click', () => {
+          if (input.type === 'password') {
+            input.type = 'text';
+            icon.classList.add('active');
+          } else {
+            input.type = 'password';
+            icon.classList.remove('active');
+          }
+        });
+      };
+
+      const passwordFields = document.querySelectorAll('.form-item-password');
+      const eyeIcons = document.querySelectorAll('.see-password');
+
+      if (passwordFields.length === eyeIcons.length) {
+        passwordFields.forEach((field, index) => {
+          togglePasswordVisibility(eyeIcons[index], field);
+        });
+      }
+    });
+  </script>
+</head>
+
+<body>
+
+  <div class="reset-container">
+    <h2>Reset Your Password</h2>
+
+    <div id="errorMessage"></div>
+
+    <form action="/auth/reset-password" method="POST" id="login_form" onsubmit="validateForm(event)">
+      <input type="hidden" name="email" />
+      <input type="hidden" name="token" />
+      <input type="hidden" name="email_time" />
+
+      <div class="form-group">
+        <input type="password" class="form-item-password" name="password" placeholder="New Password" required />
+        <span class="icon icomoon icon-eye2 see-password"></span>
+      </div>
+
+      <div class="form-group">
+        <input type="password" class="form-item-password" name="cpassword" placeholder="Confirm Password" required />
+        <span class="icon icomoon icon-eye2 see-password"></span>
+      </div>
+
+      <button type="submit" class="submit-btn">Submit</button>
+    </form>
+  </div>
+
+  <!-- <footer>
+    &copy; Esfaira 2025. All rights reserved.
+  </footer> -->
+
+</body>
+</html>
