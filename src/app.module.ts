@@ -5,6 +5,8 @@ import { UserModule } from './user/user.module';
 import { AuthModule } from './auth/auth.module';
 import { PaymentController } from './payment/payment.controller';
 import { PaymentService } from './payment/payment.service';
+import { TeamBetController } from './team-bet/team-bet.controller';
+import { TeamBetService } from './team-bet/team-bet.service';
 
 @Module({
   imports: [
@@ -15,7 +17,7 @@ import { PaymentService } from './payment/payment.service';
     UserModule,
     AuthModule,
   ],
-  controllers: [PaymentController],
-  providers: [PaymentService],
+  controllers: [PaymentController, TeamBetController],
+  providers: [PaymentService, TeamBetService],
 })
 export class AppModule {}

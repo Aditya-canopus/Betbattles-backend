@@ -98,25 +98,24 @@ export class AuthService {
     if (!email) {
       throw new BadRequestException('Email is required.');
     }
-
+  
     const user = await this.prisma.user.findUnique({ where: { email } });
     if (!user) {
       throw new NotFoundException('Email not found.');
     }
-
-    const resetToken = crypto.randomBytes(32).toString('hex');
-    const resetTokenExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
-
+  
+    // Generate 5-digit numeric code
+    const resetCode = Math.floor(10000 + Math.random() * 90000).toString();
+    const resetCodeExpiry = new Date(Date.now() + 15 * 60 * 1000); // valid for 15 mins
+  
     await this.prisma.user.update({
       where: { id: user.id },
       data: {
-        reset_token: resetToken,
-        reset_token_expiry: resetTokenExpiry,
+        reset_token: resetCode,
+        reset_token_expiry: resetCodeExpiry,
       },
     });
-
-    const resetLink = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
-
+  
     const transporter = nodemailer.createTransport({
       service: 'Gmail',
       auth: {
@@ -124,28 +123,42 @@ export class AuthService {
         pass: process.env.ADMIN_EMAIL_PASS,
       },
     });
-
+  
     const emailHTML = `
       <div style="width: 700px; margin: 0 auto;">
         <div style="background: #2f353a; padding: 15px; text-align: left;">
         </div>
         <div style="padding: 15px; text-align: center;">
-          <strong style="font-size: 18px;">Dear: ${user.name}</strong>
-          <p style="margin-top:5px;">Click below to reset your password:</p>
-          <a href="${resetLink}" style="margin-top:20px; display:inline-block; padding:10px 15px; background:#2f353a; color:white; text-decoration:none; border-radius:5px;">
-            Reset Password
-          </a>
+          <strong style="font-size: 18px;">Dear ${user.name},</strong>
+          <p style="margin-top:5px;">Your password reset code is:</p>
+          <div style="font-size: 24px; margin-top: 10px; font-weight: bold;">${resetCode}</div>
+          <p style="margin-top: 15px;">This code will expire in 15 minutes.</p>
         </div>
       </div>`;
-
+  
     await transporter.sendMail({
       from: process.env.ADMIN_EMAIL_USER,
       to: email,
-      subject: 'Password Reset Request',
+      subject: 'Your Password Reset Code',
       html: emailHTML,
     });
+  
+    return { message: 'Reset code sent to your email.' };
+  }
 
-    return { message: 'Password reset link sent to your email.' };
+  async verifyResetCode(email: string, code: string) {
+    const user = await this.prisma.user.findUnique({ where: { email } });
+  
+    if (!user || !user.reset_token || !user.reset_token_expiry) {
+      throw new NotFoundException('Invalid or expired reset code.');
+    }
+  
+    const isExpired = new Date() > user.reset_token_expiry;
+    if (isExpired || user.reset_token !== code) {
+      throw new BadRequestException('Reset code is incorrect or expired.');
+    }
+  
+    return { success: true };
   }
 
 //   async resetPasswordForm(token: string, res: Response) {
@@ -157,41 +170,50 @@ export class AuthService {
 //     return res.sendFile(filePath);
 // }
 
-  async resetPassword(token: string, password: string, cpassword: string) {
-    if (!token || !password || !cpassword) {
-      throw new BadRequestException('All fields are required.');
-    }
-
-    if (password !== cpassword) {
-      throw new BadRequestException('Passwords do not match.');
-    }
-
-    const user = await this.prisma.user.findFirst({
-      where: {
-        reset_token: token,
-        reset_token_expiry: {
-          gt: new Date(), // token is not expired
-        },
-      },
-    });
-
-    if (!user) {
-      throw new BadRequestException('Invalid or expired reset token.');
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: {
-        password: hashedPassword,
-        reset_token: null,
-        reset_token_expiry: null,
-      },
-    });
-
-    return { message: 'Password successfully reset. Please login with your new password.' };
+async resetPassword(token: string, password: string, cpassword: string) {
+  if (!token || !password || !cpassword) {
+    throw new BadRequestException('All fields are required.');
   }
+
+  if (password.length < 6) {
+    throw new BadRequestException('Password must be at least 6 characters long.');
+  }
+
+  if (password !== cpassword) {
+    throw new BadRequestException('Passwords do not match.');
+  }
+
+  const user = await this.prisma.user.findFirst({
+    where: {
+      reset_token: token,
+      reset_token_expiry: {
+        gt: new Date(), // token is not expired
+      },
+    },
+  });
+
+  if (!user) {
+    throw new BadRequestException('Invalid or expired reset token.');
+  }
+
+  const isSameAsOld = await bcrypt.compare(password, user.password);
+  if (isSameAsOld) {
+    throw new BadRequestException('New password cannot be the same as the old password.');
+  }
+
+  const hashedPassword = await bcrypt.hash(password, 10);
+
+  await this.prisma.user.update({
+    where: { id: user.id },
+    data: {
+      password: hashedPassword,
+      reset_token: null,
+      reset_token_expiry: null,
+    },
+  });
+
+  return { message: 'Password successfully reset. Please login with your new password.' };
+}
 
   async verifyIdCard(userId: number, documentPath: string) {
     try {
